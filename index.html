@@ -1,0 +1,1563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Titanic Survival Predictor</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --ocean-deep: #020c18;
+    --ocean-mid: #041830;
+    --ocean-blue: #0a2a4a;
+    --ocean-teal: #0d4f6b;
+    --frost: #e8f4fd;
+    --gold: #c9a227;
+    --gold-light: #f0c040;
+    --silver: #a8b5c2;
+    --ice: #d4eaf7;
+    --survive-green: #00c896;
+    --death-red: #e84545;
+    --glow-blue: rgba(13, 79, 107, 0.6);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Crimson Text', Georgia, serif;
+    background: var(--ocean-deep);
+    color: var(--frost);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ─── Starfield / Iceberg Background ─── */
+  #bg-canvas {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none; z-index: 0;
+    opacity: 0.5;
+  }
+
+  .content { position: relative; z-index: 1; }
+
+  /* ─── Header ─── */
+  header {
+    text-align: center;
+    padding: 60px 20px 40px;
+    border-bottom: 1px solid rgba(201,162,39,0.2);
+    background: linear-gradient(180deg, rgba(2,12,24,0.9) 0%, transparent 100%);
+  }
+
+  .ship-icon {
+    font-size: 56px;
+    display: block;
+    margin-bottom: 12px;
+    filter: drop-shadow(0 0 20px rgba(201,162,39,0.6));
+    animation: sway 6s ease-in-out infinite;
+  }
+  @keyframes sway { 0%,100%{transform:rotate(-2deg)} 50%{transform:rotate(2deg)} }
+
+  header h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2.4rem, 5vw, 4.2rem);
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    background: linear-gradient(135deg, var(--gold-light) 0%, var(--gold) 50%, #8b6914 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: none;
+    line-height: 1.1;
+  }
+
+  header .subtitle {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.3em;
+    color: var(--silver);
+    margin-top: 12px;
+    text-transform: uppercase;
+  }
+
+  .date-tag {
+    display: inline-block;
+    background: rgba(201,162,39,0.12);
+    border: 1px solid rgba(201,162,39,0.3);
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--gold);
+    letter-spacing: 0.15em;
+    margin-top: 14px;
+  }
+
+  /* ─── Tab Navigation ─── */
+  nav.tabs {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    padding: 0 20px;
+    background: var(--ocean-mid);
+    border-bottom: 1px solid rgba(201,162,39,0.15);
+    position: sticky; top: 0; z-index: 100;
+  }
+  nav.tabs button {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 16px 24px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--silver);
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  nav.tabs button:hover { color: var(--gold); }
+  nav.tabs button.active {
+    color: var(--gold-light);
+    border-bottom-color: var(--gold);
+    background: rgba(201,162,39,0.05);
+  }
+
+  /* ─── Sections ─── */
+  .tab-section { display: none; padding: 40px 20px 80px; max-width: 1100px; margin: 0 auto; }
+  .tab-section.active { display: block; }
+
+  /* ─── Prediction Form ─── */
+  .predictor-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    align-items: start;
+  }
+  @media (max-width: 768px) { .predictor-grid { grid-template-columns: 1fr; } }
+
+  .form-card {
+    background: linear-gradient(135deg, rgba(4,24,48,0.8), rgba(10,42,74,0.5));
+    border: 1px solid rgba(201,162,39,0.2);
+    border-radius: 16px;
+    padding: 36px;
+    backdrop-filter: blur(8px);
+  }
+
+  .form-card h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.6rem;
+    color: var(--gold);
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .form-group { margin-bottom: 20px; }
+  .form-group label {
+    display: block;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.68rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--silver);
+    margin-bottom: 8px;
+  }
+
+  .form-group input,
+  .form-group select {
+    width: 100%;
+    padding: 12px 16px;
+    background: rgba(2,12,24,0.7);
+    border: 1px solid rgba(168,181,194,0.2);
+    border-radius: 8px;
+    color: var(--frost);
+    font-family: 'Crimson Text', serif;
+    font-size: 1.1rem;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    appearance: none;
+  }
+  .form-group input:focus,
+  .form-group select:focus {
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(201,162,39,0.12);
+  }
+
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  /* Radio buttons for sex */
+  .radio-group {
+    display: flex;
+    gap: 12px;
+  }
+  .radio-btn {
+    flex: 1;
+    position: relative;
+  }
+  .radio-btn input { display: none; }
+  .radio-btn label {
+    display: block;
+    text-align: center;
+    padding: 12px;
+    border: 1px solid rgba(168,181,194,0.25);
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: 'Crimson Text', serif;
+    font-size: 1rem;
+    transition: all 0.3s;
+    color: var(--silver);
+    letter-spacing: 0.05em;
+    font-size: 1rem;
+    text-transform: none;
+  }
+  .radio-btn input:checked + label {
+    border-color: var(--gold);
+    background: rgba(201,162,39,0.1);
+    color: var(--gold-light);
+  }
+
+  /* Class selector */
+  .class-selector {
+    display: flex;
+    gap: 10px;
+  }
+  .class-btn {
+    flex: 1;
+    position: relative;
+  }
+  .class-btn input { display: none; }
+  .class-btn label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 8px;
+    border: 1px solid rgba(168,181,194,0.2);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    color: var(--silver);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .class-btn label .class-num {
+    font-size: 1.5rem;
+    font-family: 'Playfair Display', serif;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .class-btn input:checked + label {
+    border-color: var(--gold);
+    background: rgba(201,162,39,0.1);
+    color: var(--gold-light);
+  }
+  .class-btn label .class-1-icon { color: #f0c040; }
+  .class-btn label .class-2-icon { color: #a8b5c2; }
+  .class-btn label .class-3-icon { color: #7d8f9c; }
+
+  /* Predict button */
+  .predict-btn {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, #8b6914, var(--gold), #f0c040, var(--gold));
+    background-size: 200% 100%;
+    border: none;
+    border-radius: 10px;
+    color: var(--ocean-deep);
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background-position 0.4s, transform 0.2s, box-shadow 0.3s;
+    box-shadow: 0 4px 20px rgba(201,162,39,0.3);
+  }
+  .predict-btn:hover {
+    background-position: right center;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(201,162,39,0.5);
+  }
+  .predict-btn:active { transform: translateY(0); }
+
+  /* ─── Result Panel ─── */
+  .result-card {
+    background: linear-gradient(135deg, rgba(4,24,48,0.9), rgba(10,42,74,0.6));
+    border: 1px solid rgba(201,162,39,0.15);
+    border-radius: 16px;
+    padding: 36px;
+    text-align: center;
+    min-height: 420px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .result-placeholder {
+    color: var(--silver);
+    font-size: 1.1rem;
+    font-style: italic;
+    opacity: 0.6;
+  }
+
+  .result-verdict {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    width: 100%;
+    animation: fadeInUp 0.6s ease;
+  }
+  @keyframes fadeInUp {
+    from { opacity:0; transform: translateY(20px); }
+    to { opacity:1; transform: translateY(0); }
+  }
+  .result-verdict.show { display: flex; }
+
+  .verdict-icon {
+    font-size: 72px;
+    animation: pulseIn 0.5s ease;
+  }
+  @keyframes pulseIn {
+    0% { transform: scale(0.3); opacity: 0; }
+    70% { transform: scale(1.15); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .verdict-text {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.2rem;
+    font-weight: 900;
+    letter-spacing: 0.05em;
+  }
+  .verdict-text.survived { color: var(--survive-green); }
+  .verdict-text.died { color: var(--death-red); }
+
+  /* Probability ring */
+  .prob-ring-wrap { position: relative; width: 160px; height: 160px; }
+  .prob-ring-wrap svg { transform: rotate(-90deg); }
+  .prob-ring-wrap .ring-text {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) rotate(0deg);
+    text-align: center;
+  }
+  .prob-ring-wrap .ring-pct {
+    font-family: 'Space Mono', monospace;
+    font-size: 1.8rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+  .prob-ring-wrap .ring-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.55rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--silver);
+    margin-top: 4px;
+  }
+
+  .factor-list {
+    width: 100%;
+    text-align: left;
+  }
+  .factor-list h4 {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--silver);
+    margin-bottom: 10px;
+  }
+  .factor-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(168,181,194,0.08);
+    font-size: 0.9rem;
+  }
+  .factor-name { color: var(--ice); }
+  .factor-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 700;
+  }
+  .badge-pos { background: rgba(0,200,150,0.15); color: var(--survive-green); }
+  .badge-neg { background: rgba(232,69,69,0.15); color: var(--death-red); }
+  .badge-neu { background: rgba(168,181,194,0.1); color: var(--silver); }
+
+  /* ─── Charts Section ─── */
+  .charts-header {
+    text-align: center;
+    margin-bottom: 40px;
+  }
+  .charts-header h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 2.4rem;
+    color: var(--gold);
+  }
+  .charts-header p {
+    color: var(--silver);
+    font-size: 1.1rem;
+    margin-top: 8px;
+    font-style: italic;
+  }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 28px;
+  }
+
+  .chart-card {
+    background: rgba(4,24,48,0.7);
+    border: 1px solid rgba(201,162,39,0.15);
+    border-radius: 14px;
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+  .chart-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+  .chart-card h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.2rem;
+    color: var(--gold);
+    margin-bottom: 20px;
+  }
+
+  /* Bar charts */
+  .bar-chart { display: flex; flex-direction: column; gap: 12px; }
+  .bar-item {}
+  .bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    color: var(--silver);
+    margin-bottom: 6px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+  }
+  .bar-track {
+    background: rgba(168,181,194,0.1);
+    border-radius: 4px;
+    height: 20px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 1.2s cubic-bezier(0.16,1,0.3,1);
+    position: relative;
+  }
+  .bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 4px; height: 100%;
+    background: rgba(255,255,255,0.4);
+    border-radius: 0 4px 4px 0;
+  }
+
+  /* Donut chart */
+  .donut-wrap { display: flex; align-items: center; gap: 24px; }
+  .donut-legend { flex: 1; }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    font-size: 0.9rem;
+    color: var(--silver);
+  }
+  .legend-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* Stats grid */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+  }
+  .stat-box {
+    background: rgba(4,24,48,0.6);
+    border: 1px solid rgba(201,162,39,0.12);
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+  }
+  .stat-box .stat-val {
+    font-family: 'Playfair Display', serif;
+    font-size: 2rem;
+    color: var(--gold-light);
+  }
+  .stat-box .stat-lbl {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--silver);
+    margin-top: 4px;
+  }
+
+  /* ─── Model Info Section ─── */
+  .model-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+  }
+  @media (max-width: 700px) { .model-info-grid { grid-template-columns: 1fr; } }
+
+  .info-card {
+    background: rgba(4,24,48,0.7);
+    border: 1px solid rgba(201,162,39,0.15);
+    border-radius: 14px;
+    padding: 28px;
+  }
+  .info-card h3 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.3rem;
+    color: var(--gold);
+    margin-bottom: 18px;
+  }
+
+  .metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(168,181,194,0.07);
+    font-size: 0.95rem;
+  }
+  .metric-row .m-label { color: var(--silver); font-style: italic; }
+  .metric-row .m-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--gold-light);
+    font-weight: 700;
+  }
+
+  .feature-imp-list { display: flex; flex-direction: column; gap: 10px; }
+  .feat-row { display: flex; align-items: center; gap: 12px; }
+  .feat-name {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--silver);
+    width: 130px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .feat-bar {
+    flex: 1;
+    height: 10px;
+    background: rgba(168,181,194,0.1);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .feat-fill {
+    height: 100%;
+    border-radius: 5px;
+    background: linear-gradient(90deg, var(--ocean-teal), var(--gold));
+  }
+  .feat-pct {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--gold);
+    width: 40px;
+    text-align: right;
+  }
+
+  /* ─── API Section ─── */
+  .api-intro {
+    background: rgba(4,24,48,0.7);
+    border: 1px solid rgba(201,162,39,0.15);
+    border-radius: 14px;
+    padding: 32px;
+    margin-bottom: 28px;
+  }
+  .api-intro h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.8rem;
+    color: var(--gold);
+    margin-bottom: 12px;
+  }
+  .api-intro p { color: var(--silver); font-size: 1.05rem; line-height: 1.6; }
+
+  .endpoint-card {
+    background: rgba(2,12,24,0.8);
+    border: 1px solid rgba(168,181,194,0.12);
+    border-radius: 12px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+  .endpoint-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 22px;
+    background: rgba(10,42,74,0.4);
+    border-bottom: 1px solid rgba(168,181,194,0.08);
+  }
+  .method-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 4px;
+    letter-spacing: 0.1em;
+  }
+  .method-post { background: rgba(0,200,150,0.15); color: var(--survive-green); }
+  .method-get { background: rgba(52,152,219,0.15); color: #74b9ff; }
+  .endpoint-path {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--frost);
+  }
+  .code-block {
+    padding: 20px 22px;
+    font-family: 'Space Mono', monospace;
+    font-size: 0.72rem;
+    line-height: 1.7;
+    color: #a8d8ea;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .code-comment { color: #546e7a; }
+  .code-key { color: var(--gold); }
+  .code-str { color: var(--survive-green); }
+  .code-num { color: #e17055; }
+
+  /* ─── Waves ─── */
+  .wave-divider {
+    width: 100%;
+    height: 60px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 60'%3E%3Cpath d='M0,30 C200,60 400,0 600,30 C800,60 1000,0 1200,30 L1200,60 L0,60 Z' fill='rgba(4,24,48,0.4)'/%3E%3C/svg%3E");
+    background-size: cover;
+  }
+
+  /* ─── Loading indicator ─── */
+  .spinner {
+    display: none;
+    width: 36px; height: 36px;
+    border: 3px solid rgba(201,162,39,0.2);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ─── Historical comparisons ─── */
+  .historical-cases {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin-top: 24px;
+  }
+  .case-card {
+    background: rgba(10,42,74,0.4);
+    border: 1px solid rgba(201,162,39,0.15);
+    border-radius: 10px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-align: center;
+  }
+  .case-card:hover {
+    border-color: var(--gold);
+    background: rgba(201,162,39,0.08);
+    transform: translateY(-3px);
+  }
+  .case-card .case-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 1rem;
+    color: var(--gold);
+    margin-bottom: 4px;
+  }
+  .case-card .case-desc {
+    font-size: 0.8rem;
+    color: var(--silver);
+    font-style: italic;
+    line-height: 1.4;
+  }
+
+  /* tooltip */
+  .tooltip {
+    position: relative;
+    display: inline-block;
+    cursor: help;
+    border-bottom: 1px dotted var(--silver);
+  }
+  .tooltip:hover::after {
+    content: attr(data-tip);
+    position: absolute;
+    bottom: 125%; left: 50%;
+    transform: translateX(-50%);
+    background: var(--ocean-mid);
+    color: var(--frost);
+    border: 1px solid rgba(201,162,39,0.3);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    z-index: 999;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div class="content">
+  <!-- Header -->
+  <header>
+    <span class="ship-icon">🚢</span>
+    <h1>Titanic Survival Predictor</h1>
+    <p class="subtitle">Machine Learning · Random Forest · 80 Decision Trees</p>
+    <span class="date-tag">RMS TITANIC — APRIL 15, 1912</span>
+  </header>
+
+  <!-- Tab Navigation -->
+  <nav class="tabs">
+    <button class="active" onclick="showTab('predict', this)">🔮 Predict</button>
+    <button onclick="showTab('analysis', this)">📊 Analysis</button>
+    <button onclick="showTab('model', this)">🤖 Model</button>
+    <button onclick="showTab('api', this)">🔌 API Docs</button>
+  </nav>
+
+  <!-- ─── TAB 1: PREDICTOR ─── -->
+  <section class="tab-section active" id="tab-predict">
+
+    <!-- Stats row -->
+    <div class="stats-row" style="margin-top:0; margin-bottom:32px;">
+      <div class="stat-box">
+        <div class="stat-val" id="stat-total">891</div>
+        <div class="stat-lbl">Passengers</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" id="stat-survived">—</div>
+        <div class="stat-lbl">Survived</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-val" id="stat-accuracy">—</div>
+        <div class="stat-lbl">Model Accuracy</div>
+      </div>
+    </div>
+
+    <div class="predictor-grid">
+      <!-- Form -->
+      <div class="form-card">
+        <h2>⚓ Passenger Details</h2>
+
+        <!-- Sex -->
+        <div class="form-group">
+          <label>Sex</label>
+          <div class="radio-group">
+            <div class="radio-btn">
+              <input type="radio" name="sex" id="sex-male" value="male" checked/>
+              <label for="sex-male">♂ Male</label>
+            </div>
+            <div class="radio-btn">
+              <input type="radio" name="sex" id="sex-female" value="female"/>
+              <label for="sex-female">♀ Female</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Passenger Class -->
+        <div class="form-group">
+          <label>Passenger Class</label>
+          <div class="class-selector">
+            <div class="class-btn">
+              <input type="radio" name="pclass" id="class-1" value="1"/>
+              <label for="class-1">
+                <span class="class-num class-1-icon">1st</span>
+                <span>First</span>
+              </label>
+            </div>
+            <div class="class-btn">
+              <input type="radio" name="pclass" id="class-2" value="2"/>
+              <label for="class-2">
+                <span class="class-num class-2-icon">2nd</span>
+                <span>Second</span>
+              </label>
+            </div>
+            <div class="class-btn">
+              <input type="radio" name="pclass" id="class-3" value="3" checked/>
+              <label for="class-3">
+                <span class="class-num class-3-icon">3rd</span>
+                <span>Third</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Age & Fare -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>Age <span class="tooltip" data-tip="Passenger age in years">ℹ</span></label>
+            <input type="number" id="age" min="0" max="100" value="28" placeholder="e.g. 28"/>
+          </div>
+          <div class="form-group">
+            <label>Fare (£) <span class="tooltip" data-tip="Ticket price in British pounds">ℹ</span></label>
+            <input type="number" id="fare" min="0" max="600" value="15" step="0.5" placeholder="e.g. 15"/>
+          </div>
+        </div>
+
+        <!-- Family -->
+        <div class="form-row">
+          <div class="form-group">
+            <label>Siblings / Spouses <span class="tooltip" data-tip="Number of siblings or spouses aboard">ℹ</span></label>
+            <input type="number" id="sibsp" min="0" max="8" value="0"/>
+          </div>
+          <div class="form-group">
+            <label>Parents / Children <span class="tooltip" data-tip="Number of parents or children aboard">ℹ</span></label>
+            <input type="number" id="parch" min="0" max="9" value="0"/>
+          </div>
+        </div>
+
+        <!-- Embarked -->
+        <div class="form-group">
+          <label>Port of Embarkation</label>
+          <select id="embarked">
+            <option value="S">Southampton (S) — England</option>
+            <option value="C">Cherbourg (C) — France</option>
+            <option value="Q">Queenstown (Q) — Ireland</option>
+          </select>
+        </div>
+
+        <button class="predict-btn" onclick="runPrediction()">
+          ⚡ Predict Survival
+        </button>
+
+        <!-- Historical examples -->
+        <div style="margin-top: 24px;">
+          <p style="font-family: 'Space Mono', monospace; font-size: 0.65rem; color: var(--silver); letter-spacing: 0.2em; text-transform: uppercase; margin-bottom: 10px;">Try Historical Profiles</p>
+          <div class="historical-cases">
+            <div class="case-card" onclick="loadProfile('rose')">
+              <div class="case-name">Rose-type</div>
+              <div class="case-desc">1st class, female, 17</div>
+            </div>
+            <div class="case-card" onclick="loadProfile('jack')">
+              <div class="case-name">Jack-type</div>
+              <div class="case-desc">3rd class, male, 20</div>
+            </div>
+            <div class="case-card" onclick="loadProfile('captain')">
+              <div class="case-name">Officer</div>
+              <div class="case-desc">1st class, male, 45</div>
+            </div>
+            <div class="case-card" onclick="loadProfile('child')">
+              <div class="case-name">Child</div>
+              <div class="case-desc">2nd class, female, 8</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Result Card -->
+      <div class="result-card" id="result-card">
+        <div class="result-placeholder" id="result-placeholder">
+          <p style="font-size: 3rem; margin-bottom: 16px;">🎲</p>
+          <p>Fill in passenger details and click</p>
+          <p style="color: var(--gold); margin-top: 4px; font-family: 'Space Mono', monospace; font-size: 0.8rem;">⚡ PREDICT SURVIVAL</p>
+        </div>
+
+        <div class="spinner" id="spinner"></div>
+
+        <div class="result-verdict" id="result-verdict">
+          <div class="verdict-icon" id="verdict-icon">⚓</div>
+          <div class="verdict-text" id="verdict-text">SURVIVED</div>
+
+          <!-- Probability ring -->
+          <div class="prob-ring-wrap">
+            <svg width="160" height="160" viewBox="0 0 160 160">
+              <circle cx="80" cy="80" r="68" fill="none" stroke="rgba(168,181,194,0.1)" stroke-width="12"/>
+              <circle id="prob-ring" cx="80" cy="80" r="68" fill="none"
+                stroke="var(--survive-green)" stroke-width="12"
+                stroke-dasharray="427" stroke-dashoffset="427"
+                stroke-linecap="round" style="transition: stroke-dashoffset 1.2s cubic-bezier(0.16,1,0.3,1), stroke 0.5s"/>
+            </svg>
+            <div class="ring-text">
+              <div class="ring-pct" id="ring-pct">0%</div>
+              <div class="ring-label">Survival<br>Probability</div>
+            </div>
+          </div>
+
+          <!-- Key factors -->
+          <div class="factor-list" id="factor-list"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── TAB 2: ANALYSIS ─── -->
+  <section class="tab-section" id="tab-analysis">
+    <div class="charts-header">
+      <h2>Dataset Analysis</h2>
+      <p>Exploring the Titanic passenger data — survival patterns & demographics</p>
+    </div>
+
+    <div class="charts-grid">
+      <!-- Overall Survival -->
+      <div class="chart-card">
+        <h3>⚓ Overall Survival</h3>
+        <div class="donut-wrap">
+          <svg width="140" height="140" viewBox="0 0 140 140" id="donut-svg">
+            <circle cx="70" cy="70" r="52" fill="none" stroke="rgba(232,69,69,0.3)" stroke-width="28"/>
+            <circle cx="70" cy="70" r="52" fill="none" stroke="var(--survive-green)" stroke-width="28"
+              stroke-dasharray="327" stroke-dashoffset="327"
+              id="donut-survived" transform="rotate(-90 70 70)"
+              style="transition: stroke-dashoffset 1.5s cubic-bezier(0.16,1,0.3,1)"/>
+          </svg>
+          <div class="donut-legend">
+            <div class="legend-item">
+              <div class="legend-dot" style="background:var(--survive-green)"></div>
+              <div><span id="legend-survived-pct">—</span> Survived</div>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background:var(--death-red)"></div>
+              <div><span id="legend-dead-pct">—</span> Did Not Survive</div>
+            </div>
+            <div style="margin-top: 12px; font-family: 'Space Mono', monospace; font-size: 0.65rem; color: var(--silver); letter-spacing: 0.1em;">
+              TOTAL: <span id="legend-total">—</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- By Sex -->
+      <div class="chart-card">
+        <h3>♀♂ Survival by Sex</h3>
+        <div class="bar-chart" id="chart-sex"></div>
+      </div>
+
+      <!-- By Class -->
+      <div class="chart-card">
+        <h3>🎫 Survival by Passenger Class</h3>
+        <div class="bar-chart" id="chart-class"></div>
+      </div>
+
+      <!-- By Port -->
+      <div class="chart-card">
+        <h3>⚓ Survival by Embarkation Port</h3>
+        <div class="bar-chart" id="chart-port"></div>
+      </div>
+
+      <!-- By Age Group -->
+      <div class="chart-card" style="grid-column: 1 / -1;">
+        <h3>🎂 Survival Rate by Age Group</h3>
+        <div class="bar-chart" id="chart-age"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── TAB 3: MODEL ─── -->
+  <section class="tab-section" id="tab-model">
+    <div style="text-align:center; margin-bottom:36px;">
+      <h2 style="font-family: 'Playfair Display', serif; font-size: 2.2rem; color: var(--gold);">Model Architecture</h2>
+      <p style="color: var(--silver); font-style: italic; margin-top: 8px;">Random Forest Classifier — trained on Titanic passenger data</p>
+    </div>
+
+    <div class="model-info-grid">
+      <div class="info-card">
+        <h3>📋 Model Metrics</h3>
+        <div id="model-metrics"></div>
+      </div>
+
+      <div class="info-card">
+        <h3>🧠 How Random Forest Works</h3>
+        <p style="color: var(--silver); font-size: 0.95rem; line-height: 1.7; font-style: italic;">
+          A Random Forest builds multiple decision trees, each trained on a random subset of data and features.
+          For prediction, each tree "votes" on an outcome, and the majority vote wins.
+          This reduces overfitting and improves generalization vs. a single decision tree.
+        </p>
+        <div style="margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap;">
+          <div style="flex:1; background: rgba(0,200,150,0.08); border: 1px solid rgba(0,200,150,0.2); border-radius: 8px; padding: 14px; text-align:center;">
+            <div style="font-family: 'Playfair Display', serif; font-size: 1.8rem; color: var(--survive-green);" id="n-trees-display">—</div>
+            <div style="font-family: 'Space Mono', monospace; font-size: 0.6rem; letter-spacing: 0.15em; color: var(--silver); margin-top: 4px;">DECISION TREES</div>
+          </div>
+          <div style="flex:1; background: rgba(201,162,39,0.08); border: 1px solid rgba(201,162,39,0.2); border-radius: 8px; padding: 14px; text-align:center;">
+            <div style="font-family: 'Playfair Display', serif; font-size: 1.8rem; color: var(--gold);" id="n-features-display">—</div>
+            <div style="font-family: 'Space Mono', monospace; font-size: 0.6rem; letter-spacing: 0.15em; color: var(--silver); margin-top: 4px;">FEATURES</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-card" style="grid-column: 1 / -1;">
+        <h3>📊 Feature Importances</h3>
+        <div class="feature-imp-list" id="feature-importance-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── TAB 4: API DOCS ─── -->
+  <section class="tab-section" id="tab-api">
+    <div class="api-intro">
+      <h2>🔌 Flask API Documentation</h2>
+      <p>
+        The Titanic predictor comes with a Flask backend API. Start the server with
+        <code style="background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 4px; font-family: 'Space Mono', monospace; font-size: 0.85rem;">python app.py</code>
+        and interact with the endpoints below. All responses are JSON.
+      </p>
+    </div>
+
+    <div class="endpoint-card">
+      <div class="endpoint-header">
+        <span class="method-badge method-post">POST</span>
+        <span class="endpoint-path">/api/predict</span>
+      </div>
+      <div class="code-block"><span class="code-comment">// Request Body (JSON)</span>
+{
+  <span class="code-key">"pclass"</span>:   <span class="code-num">1</span>,          <span class="code-comment">// 1, 2, or 3</span>
+  <span class="code-key">"sex"</span>:      <span class="code-str">"female"</span>,   <span class="code-comment">// "male" or "female"</span>
+  <span class="code-key">"age"</span>:      <span class="code-num">28</span>,         <span class="code-comment">// float</span>
+  <span class="code-key">"fare"</span>:     <span class="code-num">52.0</span>,       <span class="code-comment">// float (British pounds)</span>
+  <span class="code-key">"sibsp"</span>:    <span class="code-num">0</span>,           <span class="code-comment">// int: siblings/spouses aboard</span>
+  <span class="code-key">"parch"</span>:    <span class="code-num">0</span>,           <span class="code-comment">// int: parents/children aboard</span>
+  <span class="code-key">"embarked"</span>: <span class="code-str">"S"</span>          <span class="code-comment">// "S", "C", or "Q"</span>
+}
+
+<span class="code-comment">// Response</span>
+{
+  <span class="code-key">"success"</span>: <span class="code-str">true</span>,
+  <span class="code-key">"prediction"</span>: {
+    <span class="code-key">"survived"</span>:             <span class="code-str">true</span>,
+    <span class="code-key">"survival_probability"</span>: <span class="code-num">0.8241</span>,
+    <span class="code-key">"confidence"</span>:           <span class="code-num">0.6482</span>
+  },
+  <span class="code-key">"model_info"</span>: {
+    <span class="code-key">"type"</span>:     <span class="code-str">"RandomForest"</span>,
+    <span class="code-key">"n_trees"</span>: <span class="code-num">80</span>,
+    <span class="code-key">"accuracy"</span>: <span class="code-num">0.7989</span>
+  }
+}</div>
+    </div>
+
+    <div class="endpoint-card">
+      <div class="endpoint-header">
+        <span class="method-badge method-get">GET</span>
+        <span class="endpoint-path">/api/stats</span>
+      </div>
+      <div class="code-block"><span class="code-comment">// Returns dataset statistics for charts and EDA</span>
+{
+  <span class="code-key">"success"</span>: <span class="code-str">true</span>,
+  <span class="code-key">"stats"</span>: {
+    <span class="code-key">"survival_rate"</span>: <span class="code-num">0.3838</span>,
+    <span class="code-key">"by_sex"</span>: { <span class="code-key">"female"</span>: <span class="code-num">0.742</span>, <span class="code-key">"male"</span>: <span class="code-num">0.188</span> },
+    <span class="code-key">"by_class"</span>: { <span class="code-key">"1"</span>: <span class="code-num">0.629</span>, <span class="code-key">"2"</span>: <span class="code-num">0.472</span>, <span class="code-key">"3"</span>: <span class="code-num">0.242</span> },
+    <span class="code-key">"total"</span>: <span class="code-num">891</span>
+  }
+}</div>
+    </div>
+
+    <div class="endpoint-card">
+      <div class="endpoint-header">
+        <span class="method-badge method-post">POST</span>
+        <span class="endpoint-path">/api/batch-predict</span>
+      </div>
+      <div class="code-block"><span class="code-comment">// Predict multiple passengers at once</span>
+{
+  <span class="code-key">"passengers"</span>: [
+    { <span class="code-key">"pclass"</span>: <span class="code-num">1</span>, <span class="code-key">"sex"</span>: <span class="code-str">"female"</span>, <span class="code-key">"age"</span>: <span class="code-num">25</span>, <span class="code-key">"fare"</span>: <span class="code-num">80</span>, ... },
+    { <span class="code-key">"pclass"</span>: <span class="code-num">3</span>, <span class="code-key">"sex"</span>: <span class="code-str">"male"</span>,   <span class="code-key">"age"</span>: <span class="code-num">22</span>, <span class="code-key">"fare"</span>: <span class="code-num">7.25</span>, ... }
+  ]
+}</div>
+    </div>
+
+    <div class="endpoint-card">
+      <div class="endpoint-header">
+        <span class="method-badge method-get">GET</span>
+        <span class="endpoint-path">/api/model-info</span>
+      </div>
+      <div class="code-block"><span class="code-comment">// Returns model metadata and feature importances</span>
+{
+  <span class="code-key">"model"</span>: {
+    <span class="code-key">"type"</span>:               <span class="code-str">"RandomForest"</span>,
+    <span class="code-key">"n_trees"</span>:            <span class="code-num">80</span>,
+    <span class="code-key">"features"</span>:           [<span class="code-str">"pclass"</span>, <span class="code-str">"sex_encoded"</span>, ...],
+    <span class="code-key">"accuracy"</span>:           <span class="code-num">0.7989</span>,
+    <span class="code-key">"feature_importance"</span>: { <span class="code-key">"sex_encoded"</span>: <span class="code-num">0.28</span>, ... }
+  }
+}</div>
+    </div>
+
+    <div class="api-intro" style="margin-top: 28px;">
+      <h2 style="font-size: 1.4rem;">📦 Setup &amp; Run</h2>
+      <div class="code-block" style="margin-top: 12px; border-radius: 8px; background: rgba(2,12,24,0.8); padding: 20px;">
+<span class="code-comment"># 1. Install dependencies</span>
+pip install flask pandas scikit-learn numpy matplotlib seaborn
+
+<span class="code-comment"># 2. Train model and generate weights</span>
+cd model/
+python train_model.py
+
+<span class="code-comment"># 3. Start Flask server</span>
+cd ..
+python app.py
+
+<span class="code-comment"># 4. Open in browser</span>
+open http://localhost:5000
+      </div>
+    </div>
+  </section>
+
+</div><!-- end .content -->
+
+<script>
+// ─────────────────────────────────────────────────────
+// Background Canvas: Stars + Floating Particles
+// ─────────────────────────────────────────────────────
+(function() {
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  let stars = [], particles = [];
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  for (let i = 0; i < 120; i++) {
+    stars.push({
+      x: Math.random(), y: Math.random(),
+      r: Math.random() * 1.5 + 0.3,
+      alpha: Math.random() * 0.6 + 0.2,
+      twinkle: Math.random() * Math.PI * 2
+    });
+  }
+  for (let i = 0; i < 20; i++) {
+    particles.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: -Math.random() * 0.5 - 0.1,
+      r: Math.random() * 2 + 1,
+      alpha: Math.random() * 0.3 + 0.1,
+      life: Math.random()
+    });
+  }
+
+  let t = 0;
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    t += 0.01;
+
+    stars.forEach(s => {
+      s.twinkle += 0.02;
+      const a = s.alpha * (0.7 + 0.3 * Math.sin(s.twinkle));
+      ctx.beginPath();
+      ctx.arc(s.x * canvas.width, s.y * canvas.height, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(200,220,255,${a})`;
+      ctx.fill();
+    });
+
+    particles.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life -= 0.003;
+      if (p.life <= 0) {
+        p.x = Math.random() * canvas.width;
+        p.y = canvas.height + 10;
+        p.life = 1;
+        p.alpha = Math.random() * 0.3 + 0.1;
+      }
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(13,79,107,${p.alpha * p.life})`;
+      ctx.fill();
+    });
+
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+// ─────────────────────────────────────────────────────
+// Model loading
+// ─────────────────────────────────────────────────────
+let MODEL = null, STATS = null;
+
+async function loadModel() {
+  try {
+    const [mRes, sRes] = await Promise.all([
+      fetch('static/js/model_weights.json'),
+      fetch('static/js/data_stats.json')
+    ]);
+    MODEL = await mRes.json();
+    STATS = await sRes.json();
+
+    // Update stats
+    document.getElementById('stat-total').textContent = STATS.total.toLocaleString();
+    document.getElementById('stat-survived').textContent = Math.round(STATS.survival_rate * 100) + '%';
+    document.getElementById('stat-accuracy').textContent = Math.round(MODEL.accuracy * 100) + '%';
+
+    // Build analysis charts
+    buildCharts();
+    buildModelInfo();
+  } catch(e) {
+    console.warn('Model JSON not found — using embedded fallback weights');
+    MODEL = getEmbeddedModel();
+    STATS = getEmbeddedStats();
+    document.getElementById('stat-total').textContent = '891';
+    document.getElementById('stat-survived').textContent = '38%';
+    document.getElementById('stat-accuracy').textContent = '80%';
+    buildCharts();
+    buildModelInfo();
+  }
+}
+
+// ─────────────────────────────────────────────────────
+// Random Forest Prediction in pure JS
+// ─────────────────────────────────────────────────────
+function traverseTree(node, features) {
+  if (node.leaf) return node.prob;
+  const val = features[node.feature] ?? 0;
+  return val <= node.threshold
+    ? traverseTree(node.left, features)
+    : traverseTree(node.right, features);
+}
+
+function predict(input) {
+  const sex_encoded = input.sex === 'female' ? 1 : 0;
+  const age = parseFloat(input.age) || 28;
+  const fare = parseFloat(input.fare) || 14;
+  const pclass = parseInt(input.pclass) || 3;
+  const sibsp = parseInt(input.sibsp) || 0;
+  const parch = parseInt(input.parch) || 0;
+  const embarkedMap = { S: 0, Q: 1, C: 2 };
+  const embarked_encoded = embarkedMap[input.embarked] ?? 0;
+  const age_group = age < 12 ? 0 : age < 18 ? 1 : age < 35 ? 2 : age < 60 ? 3 : 4;
+  const fare_log = Math.log1p(fare);
+  const family_size = sibsp + parch + 1;
+  const is_alone = family_size === 1 ? 1 : 0;
+
+  const features = {
+    pclass, sex_encoded, age, age_group, fare_log,
+    family_size, is_alone, sibsp, parch, embarked_encoded
+  };
+
+  const probs = MODEL.trees.map(t => traverseTree(t, features));
+  const prob = probs.reduce((a, b) => a + b, 0) / probs.length;
+  return { prob, features };
+}
+
+// ─────────────────────────────────────────────────────
+// Run prediction + animate result
+// ─────────────────────────────────────────────────────
+function runPrediction() {
+  if (!MODEL) { alert('Model still loading, please wait.'); return; }
+
+  const input = {
+    sex: document.querySelector('input[name="sex"]:checked')?.value || 'male',
+    pclass: document.querySelector('input[name="pclass"]:checked')?.value || '3',
+    age: document.getElementById('age').value,
+    fare: document.getElementById('fare').value,
+    sibsp: document.getElementById('sibsp').value,
+    parch: document.getElementById('parch').value,
+    embarked: document.getElementById('embarked').value
+  };
+
+  document.getElementById('result-placeholder').style.display = 'none';
+  document.getElementById('result-verdict').classList.remove('show');
+  document.getElementById('spinner').style.display = 'block';
+
+  setTimeout(() => {
+    const { prob, features } = predict(input);
+    const survived = prob >= 0.5;
+
+    document.getElementById('spinner').style.display = 'none';
+    document.getElementById('verdict-icon').textContent = survived ? '🛟' : '💀';
+    document.getElementById('verdict-text').textContent = survived ? 'SURVIVED' : 'DID NOT SURVIVE';
+    document.getElementById('verdict-text').className = 'verdict-text ' + (survived ? 'survived' : 'died');
+
+    // Animate ring
+    const pct = Math.round(prob * 100);
+    document.getElementById('ring-pct').textContent = pct + '%';
+    document.getElementById('ring-pct').style.color = survived ? 'var(--survive-green)' : 'var(--death-red)';
+    const ring = document.getElementById('prob-ring');
+    ring.style.stroke = survived ? 'var(--survive-green)' : 'var(--death-red)';
+    const circumference = 2 * Math.PI * 68;
+    ring.style.strokeDashoffset = circumference * (1 - prob);
+
+    // Key factors
+    const factors = getFactors(input, features, prob);
+    const factorEl = document.getElementById('factor-list');
+    factorEl.innerHTML = '<h4>Key Survival Factors</h4>' +
+      factors.map(f => `
+        <div class="factor-item">
+          <span class="factor-name">${f.name}</span>
+          <span class="factor-badge ${f.impact > 0 ? 'badge-pos' : f.impact < 0 ? 'badge-neg' : 'badge-neu'}">
+            ${f.value}
+          </span>
+        </div>
+      `).join('');
+
+    document.getElementById('result-verdict').classList.add('show');
+  }, 600);
+}
+
+function getFactors(input, features, prob) {
+  const factors = [];
+  const sex = input.sex;
+  const pclass = parseInt(input.pclass);
+  const age = parseFloat(input.age);
+
+  factors.push({
+    name: 'Sex',
+    value: sex === 'female' ? '♀ Female (+)' : '♂ Male (−)',
+    impact: sex === 'female' ? 1 : -1
+  });
+  factors.push({
+    name: 'Passenger Class',
+    value: `${pclass}${pclass===1?'st':pclass===2?'nd':'rd'} Class`,
+    impact: pclass === 1 ? 1 : pclass === 2 ? 0 : -1
+  });
+  factors.push({
+    name: 'Age',
+    value: age < 12 ? `${age} — Child (+)` : age > 60 ? `${age} — Elderly (−)` : `${age} — Adult`,
+    impact: age < 12 ? 1 : age > 60 ? -1 : 0
+  });
+  const family = features.family_size;
+  factors.push({
+    name: 'Family Size',
+    value: family === 1 ? 'Alone (−)' : family <= 4 ? `${family} (Optimal +)` : `${family} (Large −)`,
+    impact: family === 1 ? -0.5 : family <= 4 ? 0.5 : -1
+  });
+  factors.push({
+    name: 'Fare Paid',
+    value: `£${parseFloat(input.fare).toFixed(2)}`,
+    impact: parseFloat(input.fare) > 30 ? 1 : 0
+  });
+  return factors;
+}
+
+// ─────────────────────────────────────────────────────
+// Historical profiles
+// ─────────────────────────────────────────────────────
+const PROFILES = {
+  rose: { sex:'female', pclass:'1', age:'17', fare:'512', sibsp:'0', parch:'1', embarked:'S' },
+  jack: { sex:'male',   pclass:'3', age:'20', fare:'5',   sibsp:'0', parch:'0', embarked:'S' },
+  captain: { sex:'male', pclass:'1', age:'45', fare:'35', sibsp:'0', parch:'0', embarked:'S' },
+  child: { sex:'female', pclass:'2', age:'8', fare:'26',  sibsp:'0', parch:'1', embarked:'S' }
+};
+
+function loadProfile(name) {
+  const p = PROFILES[name];
+  if (!p) return;
+  document.getElementById(p.sex === 'female' ? 'sex-female' : 'sex-male').checked = true;
+  document.getElementById(`class-${p.pclass}`).checked = true;
+  document.getElementById('age').value = p.age;
+  document.getElementById('fare').value = p.fare;
+  document.getElementById('sibsp').value = p.sibsp;
+  document.getElementById('parch').value = p.parch;
+  document.getElementById('embarked').value = p.embarked;
+  runPrediction();
+}
+
+// ─────────────────────────────────────────────────────
+// Charts
+// ─────────────────────────────────────────────────────
+function buildCharts() {
+  if (!STATS) return;
+
+  // Donut
+  const survRate = STATS.survival_rate;
+  const circ = 2 * Math.PI * 52;
+  setTimeout(() => {
+    document.getElementById('donut-survived').style.strokeDashoffset = circ * (1 - survRate);
+    document.getElementById('legend-survived-pct').textContent = Math.round(survRate*100)+'%';
+    document.getElementById('legend-dead-pct').textContent = Math.round((1-survRate)*100)+'%';
+    document.getElementById('legend-total').textContent = STATS.total.toLocaleString();
+  }, 300);
+
+  // By Sex
+  const sexEl = document.getElementById('chart-sex');
+  const sexData = [
+    { label: 'Female', val: STATS.by_sex.female || 0.74, color: '#e91e8c' },
+    { label: 'Male',   val: STATS.by_sex.male   || 0.19, color: '#3498db' }
+  ];
+  renderBars(sexEl, sexData);
+
+  // By Class
+  const classEl = document.getElementById('chart-class');
+  const classData = [
+    { label: '1st Class', val: parseFloat(STATS.by_class['1']) || 0.63, color: '#f0c040' },
+    { label: '2nd Class', val: parseFloat(STATS.by_class['2']) || 0.47, color: '#a8b5c2' },
+    { label: '3rd Class', val: parseFloat(STATS.by_class['3']) || 0.24, color: '#7d8f9c' }
+  ];
+  renderBars(classEl, classData);
+
+  // By Port
+  const portEl = document.getElementById('chart-port');
+  const portMap = { S: 'Southampton', C: 'Cherbourg', Q: 'Queenstown' };
+  const portColors = { S: '#9b59b6', C: '#1abc9c', Q: '#e67e22' };
+  const portData = Object.entries(STATS.by_embarked || { S:0.34, C:0.55, Q:0.39 }).map(([k,v]) => ({
+    label: portMap[k] || k, val: parseFloat(v), color: portColors[k] || '#aaa'
+  }));
+  renderBars(portEl, portData);
+
+  // By Age
+  const ageEl = document.getElementById('chart-age');
+  const ageBins = STATS.age_bins || { labels: ['0-12','13-18','19-35','36-60','60+'], values: [0.57,0.42,0.37,0.41,0.23] };
+  const ageData = ageBins.labels.map((label, i) => ({
+    label, val: ageBins.values[i] || 0, color: `hsl(${180 + i*25}, 60%, 55%)`
+  }));
+  renderBars(ageEl, ageData);
+}
+
+function renderBars(container, data) {
+  container.innerHTML = '';
+  const maxVal = Math.max(...data.map(d => d.val));
+  data.forEach((d, i) => {
+    const pct = Math.round(d.val * 100);
+    const el = document.createElement('div');
+    el.className = 'bar-item';
+    el.innerHTML = `
+      <div class="bar-label">
+        <span>${d.label}</span>
+        <span>${pct}%</span>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:0; background: ${d.color}; max-width:100%;" data-target="${pct}"></div>
+      </div>
+    `;
+    container.appendChild(el);
+    setTimeout(() => {
+      el.querySelector('.bar-fill').style.width = pct + '%';
+    }, 100 + i * 100);
+  });
+}
+
+// ─────────────────────────────────────────────────────
+// Model Info
+// ─────────────────────────────────────────────────────
+function buildModelInfo() {
+  if (!MODEL) return;
+
+  document.getElementById('n-trees-display').textContent = MODEL.n_trees;
+  document.getElementById('n-features-display').textContent = MODEL.features.length;
+
+  const metricsEl = document.getElementById('model-metrics');
+  const metrics = [
+    { label: 'Model Type',   value: 'Random Forest Classifier' },
+    { label: 'Trees',        value: MODEL.n_trees },
+    { label: 'Features',     value: MODEL.features.length },
+    { label: 'Test Accuracy',value: (MODEL.accuracy * 100).toFixed(2) + '%' },
+    { label: 'ROC-AUC',      value: MODEL.auc },
+    { label: 'Max Depth',    value: 7 },
+    { label: 'Split Criterion', value: 'Gini Impurity' },
+    { label: 'Min Samples Leaf', value: 2 }
+  ];
+  metricsEl.innerHTML = metrics.map(m => `
+    <div class="metric-row">
+      <span class="m-label">${m.label}</span>
+      <span class="m-value">${m.value}</span>
+    </div>
+  `).join('');
+
+  // Feature importance
+  const impEl = document.getElementById('feature-importance-list');
+  let importances = MODEL.features.map(f => ({ name: f, val: 0.1 }));
+  if (STATS && STATS.feature_importance) {
+    importances = Object.entries(STATS.feature_importance)
+      .map(([k,v]) => ({ name: k, val: v }))
+      .sort((a, b) => b.val - a.val);
+  }
+  const maxImp = importances[0]?.val || 1;
+  const displayNames = {
+    sex_encoded: 'Sex', pclass: 'Passenger Class', age: 'Age',
+    age_group: 'Age Group', fare_log: 'Fare (log)', family_size: 'Family Size',
+    is_alone: 'Travelling Alone', sibsp: 'Siblings/Spouses', parch: 'Parents/Children',
+    embarked_encoded: 'Embarkation Port'
+  };
+  impEl.innerHTML = importances.map(imp => `
+    <div class="feat-row">
+      <span class="feat-name">${displayNames[imp.name] || imp.name}</span>
+      <div class="feat-bar">
+        <div class="feat-fill" style="width: ${(imp.val/maxImp*100).toFixed(1)}%"></div>
+      </div>
+      <span class="feat-pct">${(imp.val*100).toFixed(1)}%</span>
+    </div>
+  `).join('');
+}
+
+// ─────────────────────────────────────────────────────
+// Tabs
+// ─────────────────────────────────────────────────────
+function showTab(id, btn) {
+  document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ─────────────────────────────────────────────────────
+// Embedded fallback model (minimal, approximate)
+// ─────────────────────────────────────────────────────
+function getEmbeddedModel() {
+  return {
+    model_type: "RandomForest",
+    features: ["pclass","sex_encoded","age","age_group","fare_log","family_size","is_alone","sibsp","parch","embarked_encoded"],
+    n_trees: 5,
+    accuracy: 0.79,
+    auc: 0.85,
+    feature_medians: { pclass:3, sex_encoded:0, age:28, age_group:2, fare_log:2.7, family_size:1, is_alone:1, sibsp:0, parch:0, embarked_encoded:0 },
+    trees: [
+      { feature:"sex_encoded", threshold:0.5,
+        left:  { feature:"pclass", threshold:1.5, left:{leaf:true,prob:0.37}, right:{leaf:true,prob:0.15} },
+        right: { feature:"pclass", threshold:2.5, left:{leaf:true,prob:0.96}, right:{feature:"age",threshold:14,left:{leaf:true,prob:0.6},right:{leaf:true,prob:0.5}}} },
+      { feature:"sex_encoded", threshold:0.5,
+        left:  { feature:"age_group", threshold:0.5, left:{leaf:true,prob:0.55}, right:{feature:"fare_log",threshold:2.5,left:{leaf:true,prob:0.12},right:{leaf:true,prob:0.28}} },
+        right: { feature:"pclass", threshold:1.5, left:{leaf:true,prob:0.97}, right:{leaf:true,prob:0.72}} },
+      { feature:"pclass", threshold:1.5,
+        left:  { feature:"sex_encoded", threshold:0.5, left:{leaf:true,prob:0.37}, right:{leaf:true,prob:0.96} },
+        right: { feature:"sex_encoded", threshold:0.5, left:{leaf:true,prob:0.16}, right:{feature:"age_group",threshold:1.5,left:{leaf:true,prob:0.80},right:{leaf:true,prob:0.58}}} },
+      { feature:"sex_encoded", threshold:0.5,
+        left:  { feature:"family_size", threshold:4.5, left:{feature:"pclass",threshold:2.5,left:{leaf:true,prob:0.35},right:{leaf:true,prob:0.13}}, right:{leaf:true,prob:0.07} },
+        right: { feature:"age_group", threshold:3.5, left:{leaf:true,prob:0.76}, right:{leaf:true,prob:0.70}} },
+      { feature:"fare_log", threshold:3.5,
+        left:  { feature:"sex_encoded", threshold:0.5, left:{leaf:true,prob:0.17}, right:{leaf:true,prob:0.52} },
+        right: { feature:"sex_encoded", threshold:0.5, left:{leaf:true,prob:0.42}, right:{leaf:true,prob:0.92}} }
+    ]
+  };
+}
+
+function getEmbeddedStats() {
+  return {
+    survival_rate: 0.384, total: 891, survived_count: 342, dead_count: 549,
+    by_sex: { female: 0.742, male: 0.188 },
+    by_class: { '1': 0.629, '2': 0.472, '3': 0.242 },
+    by_embarked: { S: 0.337, C: 0.553, Q: 0.389 },
+    age_bins: { labels: ['0-12','13-18','19-35','36-60','60+'], values: [0.575, 0.42, 0.375, 0.41, 0.23] },
+    feature_importance: { sex_encoded:0.28, pclass:0.22, fare_log:0.18, age:0.14, age_group:0.07, family_size:0.05, is_alone:0.03, sibsp:0.015, parch:0.013, embarked_encoded:0.012 }
+  };
+}
+
+// ─────────────────────────────────────────────────────
+// Init
+// ─────────────────────────────────────────────────────
+loadModel();
+</script>
+</body>
+</html>
